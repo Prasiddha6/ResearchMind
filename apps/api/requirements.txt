@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+sqlalchemy
+asyncpg
+redis
+qdrant-client
+openai
+sentence-transformers
+pymupdf
+python-dotenv
+httpx
+pytest
+pytest-asyncio
+ruff
