@@ -3,6 +3,8 @@
 ResearchMind is a full-stack research assistant that uses Retrieval-Augmented Generation (RAG) to answer questions from uploaded research documents.
 
 The system processes PDF documents, creates semantic embeddings, stores them in a vector database, retrieves relevant evidence, and generates grounded answers using an LLM.
+<img width="1470" height="956" alt="image" src="https://github.com/user-attachments/assets/2a560340-6bbb-4f00-b1c8-f5c94d8a0880" />
+<img width="1470" height="956" alt="image" src="https://github.com/user-attachments/assets/d05f1ebc-6500-4e60-b83a-718d13c1789b" />
 
 ## Project Links
 
