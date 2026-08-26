@@ -4,8 +4,10 @@ import {
   Activity,
   ArrowUpRight,
   BookOpen,
+  Check,
   CheckCircle2,
   Clock3,
+  Copy,
   FileText,
   HeartPulse,
   Loader2,
@@ -19,6 +21,8 @@ import {
   Upload,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -48,6 +52,10 @@ const exampleQuestions = [
   "What limitations did the study identify?",
 ];
 
+function formatAnswer(text: string) {
+  return text.replace(/\[Source (\d+)\]/g, "**[Source $1]**");
+}
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -57,11 +65,17 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [document, setDocument] = useState<UploadedDocument | null>(null);
   const [history, setHistory] = useState<Conversation[]>([]);
+  const [copied, setCopied] = useState(false);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      setMessage("Please upload a PDF research paper.");
+      return;
+    }
 
     setUploading(true);
     setMessage("");
@@ -109,6 +123,7 @@ export default function Home() {
     setAsking(true);
     setAnswer("");
     setSources([]);
+    setCopied(false);
 
     try {
       const response = await fetch(`${API_URL}/chat`, {
@@ -159,27 +174,41 @@ export default function Home() {
     setAnswer("");
     setSources([]);
     setMessage("");
+    setCopied(false);
   }
 
   function selectHistory(item: Conversation) {
     setQuestion(item.question);
     setAnswer(item.answer);
     setSources(item.sources);
+    setCopied(false);
   }
 
   function clearHistory() {
     setHistory([]);
   }
 
+  async function copyAnswer() {
+    if (!answer) return;
+
+    await navigator.clipboard.writeText(answer);
+    setCopied(true);
+
+    window.setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+  }
+
   return (
     <main className="min-h-screen overflow-hidden">
-      {/* Background atmosphere */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="float-slow absolute -left-24 top-28 h-64 w-64 rounded-full bg-pink-200/30 blur-3xl" />
+
         <div
           className="float-slow absolute -right-24 top-20 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl"
           style={{ animationDelay: "1.5s" }}
         />
+
         <div className="absolute left-1/2 top-[55%] h-80 w-80 -translate-x-1/2 rounded-full bg-violet-100/30 blur-3xl" />
       </div>
 
@@ -194,6 +223,7 @@ export default function Home() {
             <p className="text-lg font-bold tracking-tight text-slate-800">
               ResearchMind
             </p>
+
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               AI research companion
             </p>
@@ -247,18 +277,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Main workspace */}
+      {/* Workspace */}
       <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[330px_1fr]">
-          {/* Left panel */}
+          {/* Sidebar */}
           <aside className="space-y-6">
-            {/* Upload */}
+            {/* Library */}
             <div className="soft-card gradient-border rounded-3xl p-5">
               <div className="mb-6 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-slate-800">
                     Research library
                   </p>
+
                   <p className="mt-1 text-xs text-slate-400">
                     Build your evidence base
                   </p>
@@ -341,6 +372,7 @@ export default function Home() {
                     <p className="text-sm font-bold text-slate-800">
                       Recent questions
                     </p>
+
                     <p className="text-[10px] text-slate-400">
                       Your current session
                     </p>
@@ -397,7 +429,7 @@ export default function Home() {
             </div>
           </aside>
 
-          {/* Chat */}
+          {/* Main */}
           <section className="soft-card rounded-3xl p-5 sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
@@ -504,13 +536,18 @@ export default function Home() {
                     <Activity size={18} className="animate-pulse" />
                   </div>
 
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-bold text-slate-700">
                       Searching your research
                     </p>
+
                     <p className="mt-1 text-xs text-slate-400">
                       Retrieving relevant evidence and preparing an answer...
                     </p>
+
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
+                      <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-sky-300 to-pink-300" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -520,27 +557,104 @@ export default function Home() {
             {answer && !asking && (
               <article className="fade-up mt-8">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-pink-100 text-sky-600">
-                      <Sparkles size={17} />
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-pink-100 text-sky-600">
+                        <Sparkles size={17} />
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">
+                          ResearchMind&apos;s answer
+                        </p>
+
+                        <p className="text-[10px] text-slate-400">
+                          Grounded in your uploaded evidence
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">
-                        ResearchMind&apos;s answer
-                      </p>
-
-                      <p className="text-[10px] text-slate-400">
-                        Grounded in your uploaded evidence
-                      </p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={copyAnswer}
+                      aria-label="Copy answer"
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-400 transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600"
+                    >
+                      {copied ? (
+                        <>
+                          <Check size={13} />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} />
+                          Copy
+                        </>
+                      )}
+                    </button>
                   </div>
 
-                  <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                    {answer}
-                  </p>
+                  <div className="prose prose-sm mt-6 max-w-none text-slate-600">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-4 leading-7 last:mb-0">{children}</p>
+                        ),
+
+                        strong: ({ children }) => (
+                          <strong className="font-bold text-slate-800">
+                            {children}
+                          </strong>
+                        ),
+
+                        h1: ({ children }) => (
+                          <h1 className="mb-3 mt-6 text-xl font-bold text-slate-800">
+                            {children}
+                          </h1>
+                        ),
+
+                        h2: ({ children }) => (
+                          <h2 className="mb-3 mt-6 text-lg font-bold text-slate-800">
+                            {children}
+                          </h2>
+                        ),
+
+                        h3: ({ children }) => (
+                          <h3 className="mb-2 mt-5 text-sm font-bold text-slate-800">
+                            {children}
+                          </h3>
+                        ),
+
+                        ul: ({ children }) => (
+                          <ul className="mb-4 ml-5 list-disc space-y-2">
+                            {children}
+                          </ul>
+                        ),
+
+                        ol: ({ children }) => (
+                          <ol className="mb-4 ml-5 list-decimal space-y-2">
+                            {children}
+                          </ol>
+                        ),
+
+                        li: ({ children }) => (
+                          <li className="leading-6">{children}</li>
+                        ),
+
+                        blockquote: ({ children }) => (
+                          <blockquote className="my-4 rounded-xl border-l-4 border-pink-300 bg-pink-50 px-4 py-3 text-slate-600">
+                            {children}
+                          </blockquote>
+                        ),
+                      }}
+                    >
+                      {formatAnswer(answer)}
+                    </ReactMarkdown>
+                  </div>
                 </div>
 
+                {/* Evidence */}
                 {sources.length > 0 && (
                   <div className="mt-5">
                     <div className="mb-3 flex items-center justify-between">
@@ -550,7 +664,7 @@ export default function Home() {
                         </p>
 
                         <p className="text-[11px] text-slate-400">
-                          Source passages retrieved for this answer
+                          Retrieved passages supporting this answer
                         </p>
                       </div>
 
@@ -563,17 +677,24 @@ export default function Home() {
                       {sources.map((source, index) => (
                         <div
                           key={`${source.filename}-${source.page}-${index}`}
-                          className="group rounded-2xl border border-slate-200 bg-slate-50/60 p-4 transition-all hover:border-sky-200 hover:bg-sky-50/40"
+                          className="group rounded-2xl border border-slate-200 bg-slate-50/60 p-4 transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/40 hover:shadow-md hover:shadow-sky-100/40"
                         >
                           <div className="flex gap-3">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-pink-500 shadow-sm">
                               {index + 1}
                             </div>
 
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-slate-700">
-                                {source.filename}
-                              </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="truncate text-xs font-bold text-slate-700">
+                                  {source.filename}
+                                </p>
+
+                                <FileText
+                                  size={14}
+                                  className="shrink-0 text-sky-400"
+                                />
+                              </div>
 
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-400">
@@ -591,6 +712,25 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+
+                {/* Responsible AI note */}
+                <div className="mt-5 flex gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                  <div className="mt-0.5 shrink-0 text-amber-500">
+                    <CheckCircle2 size={16} />
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-bold text-amber-800">
+                      Research support, not medical advice
+                    </p>
+
+                    <p className="mt-1 text-[10px] leading-5 text-amber-700/80">
+                      ResearchMind is designed to help explore literature. It
+                      should not replace professional medical judgment,
+                      diagnosis, or treatment decisions.
+                    </p>
+                  </div>
+                </div>
               </article>
             )}
           </section>
