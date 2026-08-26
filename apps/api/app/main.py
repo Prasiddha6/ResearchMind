@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.api.documents import router as documents_router
+from app.api.chat import router as chat_router
 
 settings = get_settings()
 
@@ -38,3 +39,4 @@ async def api_root():
     }
 
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
