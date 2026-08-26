@@ -6,7 +6,6 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from app.core.config import get_settings
 from app.services.embeddings import embed_texts
 
-
 COLLECTION = "research_documents"
 VECTOR_SIZE = 384
 
@@ -20,8 +19,7 @@ def ensure_collection():
     client = get_client()
 
     collections = {
-        collection.name
-        for collection in client.get_collections().collections
+        collection.name for collection in client.get_collections().collections
     }
 
     if COLLECTION not in collections:

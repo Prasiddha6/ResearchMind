@@ -2,7 +2,6 @@ from openai import AsyncOpenAI
 
 from app.core.config import get_settings
 
-
 SYSTEM_PROMPT = """You are ResearchMind, a research assistant.
 
 Answer questions using only the supplied document context.
@@ -30,9 +29,7 @@ async def generate_answer(
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     context = "\n\n".join(
-        f"[Source {index + 1}] "
-        f"{item['filename']} — page {item['page']}\n"
-        f"{item['text']}"
+        f"[Source {index + 1}] {item['filename']} — page {item['page']}\n{item['text']}"
         for index, item in enumerate(contexts)
     )
 
@@ -43,10 +40,7 @@ async def generate_answer(
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": (
-                    f"Document context:\n\n{context}\n\n"
-                    f"Question: {question}"
-                ),
+                "content": (f"Document context:\n\n{context}\n\nQuestion: {question}"),
             },
         ],
     )
