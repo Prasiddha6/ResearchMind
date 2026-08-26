@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: Annotated[UploadFile, File()]):
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
