@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  AlertCircle,
   ArrowUpRight,
   BookOpen,
   Check,
@@ -19,8 +20,9 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -34,8 +36,10 @@ type Source = {
 };
 
 type UploadedDocument = {
+  id: number;
   filename: string;
   chunks: number;
+  uploadedAt: string;
 };
 
 type Conversation = {
@@ -57,28 +61,50 @@ function formatAnswer(text: string) {
 }
 
 export default function Home() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
+
   const [uploading, setUploading] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
   const [message, setMessage] = useState("");
-  const [document, setDocument] = useState<UploadedDocument | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "error" | "info">(
+    "info",
+  );
+
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [history, setHistory] = useState<Conversation[]>([]);
   const [copied, setCopied] = useState(false);
 
-  async function upload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  function notify(
+    text: string,
+    type: "success" | "error" | "info" = "info",
+  ) {
+    setMessage(text);
+    setMessageType(type);
 
-    if (!file) return;
+    window.setTimeout(() => {
+      setMessage("");
+    }, 4000);
+  }
 
+  async function processFile(file: File) {
     if (file.type !== "application/pdf") {
-      setMessage("Please upload a PDF research paper.");
+      notify("Only PDF research papers are supported.", "error");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      notify("Please upload a PDF smaller than 25 MB.", "error");
       return;
     }
 
     setUploading(true);
-    setMessage("");
+    notify("Uploading and indexing your research paper...", "info");
 
     const form = new FormData();
     form.append("file", file);
@@ -95,21 +121,59 @@ export default function Home() {
         throw new Error(data.detail || "Unable to process this document.");
       }
 
-      setDocument({
-        filename: data.filename,
-        chunks: data.chunks_indexed,
-      });
+      const newDocument: UploadedDocument = {
+        id: Date.now(),
+        filename: data.filename || file.name,
+        chunks: data.chunks_indexed || 0,
+        uploadedAt: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
 
-      setMessage("Research paper successfully added to your workspace.");
+      setDocuments((current) => [newDocument, ...current]);
+
+      notify("Research paper indexed successfully.", "success");
     } catch (error) {
-      setMessage(
+      notify(
         error instanceof Error
           ? error.message
-          : "Something went wrong while processing the PDF.",
+          : "Something went wrong while uploading the PDF.",
+        "error",
       );
     } finally {
       setUploading(false);
-      event.target.value = "";
+    }
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      processFile(file);
+    }
+
+    event.target.value = "";
+  }
+
+  function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(false);
+
+    const file = event.dataTransfer.files?.[0];
+
+    if (file) {
+      processFile(file);
     }
   }
 
@@ -143,14 +207,14 @@ export default function Home() {
       }
 
       setAnswer(data.answer);
-      setSources(data.sources);
+      setSources(data.sources || []);
 
       setHistory((current) => [
         {
           id: Date.now(),
           question: submittedQuestion,
           answer: data.answer,
-          sources: data.sources,
+          sources: data.sources || [],
           createdAt: new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -164,6 +228,8 @@ export default function Home() {
           ? error.message
           : "Something went wrong. Please try again.",
       );
+
+      setSources([]);
     } finally {
       setAsking(false);
     }
@@ -173,7 +239,6 @@ export default function Home() {
     setQuestion("");
     setAnswer("");
     setSources([]);
-    setMessage("");
     setCopied(false);
   }
 
@@ -186,21 +251,32 @@ export default function Home() {
 
   function clearHistory() {
     setHistory([]);
+    notify("Question history cleared.", "success");
+  }
+
+  function removeDocument(id: number) {
+    setDocuments((current) => current.filter((doc) => doc.id !== id));
+    notify("Document removed from the current workspace.", "success");
   }
 
   async function copyAnswer() {
     if (!answer) return;
 
-    await navigator.clipboard.writeText(answer);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(answer);
+      setCopied(true);
 
-    window.setTimeout(() => {
-      setCopied(false);
-    }, 1800);
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1800);
+    } catch {
+      notify("Unable to copy the answer.", "error");
+    }
   }
 
   return (
     <main className="min-h-screen overflow-hidden">
+      {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="float-slow absolute -left-24 top-28 h-64 w-64 rounded-full bg-pink-200/30 blur-3xl" />
 
@@ -211,6 +287,52 @@ export default function Home() {
 
         <div className="absolute left-1/2 top-[55%] h-80 w-80 -translate-x-1/2 rounded-full bg-violet-100/30 blur-3xl" />
       </div>
+
+      {/* Toast */}
+      {message && (
+        <div className="fixed right-4 top-4 z-50 w-[calc(100%-2rem)] max-w-sm">
+          <div
+            className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
+              messageType === "error"
+                ? "border-red-100"
+                : messageType === "success"
+                  ? "border-emerald-100"
+                  : "border-sky-100"
+            }`}
+          >
+            <div
+              className={`mt-0.5 rounded-lg p-2 ${
+                messageType === "error"
+                  ? "bg-red-50 text-red-500"
+                  : messageType === "success"
+                    ? "bg-emerald-50 text-emerald-500"
+                    : "bg-sky-50 text-sky-500"
+              }`}
+            >
+              {messageType === "error" ? (
+                <AlertCircle size={15} />
+              ) : messageType === "success" ? (
+                <CheckCircle2 size={15} />
+              ) : (
+                <Activity size={15} />
+              )}
+            </div>
+
+            <p className="flex-1 text-xs font-semibold leading-5 text-slate-600">
+              {message}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setMessage("")}
+              className="text-slate-300 hover:text-slate-500"
+              aria-label="Close notification"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
@@ -277,12 +399,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Workspace */}
+      {/* Main workspace */}
       <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[330px_1fr]">
           {/* Sidebar */}
           <aside className="space-y-6">
-            {/* Library */}
+            {/* Documents */}
             <div className="soft-card gradient-border rounded-3xl p-5">
               <div className="mb-6 flex items-start justify-between">
                 <div>
@@ -291,7 +413,11 @@ export default function Home() {
                   </p>
 
                   <p className="mt-1 text-xs text-slate-400">
-                    Build your evidence base
+                    {documents.length === 0
+                      ? "Build your evidence base"
+                      : `${documents.length} paper${
+                          documents.length === 1 ? "" : "s"
+                        } in this session`}
                   </p>
                 </div>
 
@@ -300,8 +426,21 @@ export default function Home() {
                 </div>
               </div>
 
-              <label className="group block cursor-pointer">
-                <div className="rounded-2xl border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 to-pink-50 p-7 text-center transition-all group-hover:border-pink-300 group-hover:shadow-md">
+              <label
+                className={`group block cursor-pointer ${
+                  dragging ? "scale-[1.01]" : ""
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div
+                  className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
+                    dragging
+                      ? "border-pink-400 bg-pink-50 shadow-lg shadow-pink-100"
+                      : "border-sky-200 bg-gradient-to-br from-sky-50 to-pink-50 group-hover:border-pink-300 group-hover:shadow-md"
+                  }`}
+                >
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-sky-500 shadow-sm transition-transform group-hover:-translate-y-1">
                     {uploading ? (
                       <Loader2 size={24} className="animate-spin" />
@@ -315,7 +454,7 @@ export default function Home() {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Upload a PDF to expand your research workspace
+                    Drag & drop or choose a PDF
                   </p>
 
                   <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-sky-600 shadow-sm">
@@ -325,38 +464,49 @@ export default function Home() {
                 </div>
 
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".pdf,application/pdf"
                   className="hidden"
-                  onChange={upload}
+                  onChange={handleFileChange}
                   disabled={uploading}
                 />
               </label>
 
-              {document && (
-                <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                  <div className="flex gap-3">
-                    <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-500 shadow-sm">
-                      <FileText size={16} />
-                    </div>
+              {documents.length > 0 && (
+                <div className="mt-5 space-y-2">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="group rounded-2xl border border-emerald-100 bg-emerald-50 p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-white p-2 text-emerald-500 shadow-sm">
+                          <FileText size={15} />
+                        </div>
 
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-slate-700">
-                        {document.filename}
-                      </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-slate-700">
+                            {doc.filename}
+                          </p>
 
-                      <p className="mt-1 text-[11px] text-emerald-600">
-                        {document.chunks} evidence chunks indexed
-                      </p>
+                          <p className="mt-1 text-[10px] text-emerald-600">
+                            {doc.chunks} chunks · {doc.uploadedAt}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeDocument(doc.id)}
+                          aria-label={`Remove ${doc.filename}`}
+                          className="rounded-lg p-2 text-slate-300 opacity-0 transition-all hover:bg-white hover:text-red-400 group-hover:opacity-100"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              )}
-
-              {message && (
-                <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">
-                  {message}
-                </p>
               )}
             </div>
 
@@ -408,7 +558,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {history.slice(0, 5).map((item) => (
+                  {history.slice(0, 6).map((item) => (
                     <button
                       key={item.id}
                       type="button"
@@ -429,7 +579,7 @@ export default function Home() {
             </div>
           </aside>
 
-          {/* Main */}
+          {/* Chat workspace */}
           <section className="soft-card rounded-3xl p-5 sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
@@ -444,8 +594,7 @@ export default function Home() {
                 </div>
 
                 <p className="mt-2 text-xs text-slate-400">
-                  Ask questions and discover evidence from your uploaded
-                  literature.
+                  Ask questions and discover evidence from your literature.
                 </p>
               </div>
 
@@ -459,7 +608,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Input */}
+            {/* Question input */}
             <form onSubmit={ask} className="mt-7">
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2 transition-all focus-within:border-sky-300 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-sky-100/50">
                 <textarea
@@ -542,7 +691,7 @@ export default function Home() {
                     </p>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      Retrieving relevant evidence and preparing an answer...
+                      Retrieving evidence and preparing an answer...
                     </p>
 
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
@@ -654,7 +803,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Evidence */}
+                {/* Sources */}
                 {sources.length > 0 && (
                   <div className="mt-5">
                     <div className="mb-3 flex items-center justify-between">
@@ -713,7 +862,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Responsible AI note */}
+                {/* Safety */}
                 <div className="mt-5 flex gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
                   <div className="mt-0.5 shrink-0 text-amber-500">
                     <CheckCircle2 size={16} />
@@ -725,7 +874,7 @@ export default function Home() {
                     </p>
 
                     <p className="mt-1 text-[10px] leading-5 text-amber-700/80">
-                      ResearchMind is designed to help explore literature. It
+                      ResearchMind helps explore scientific literature. It
                       should not replace professional medical judgment,
                       diagnosis, or treatment decisions.
                     </p>
