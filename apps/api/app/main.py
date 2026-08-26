@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.api.documents import router as documents_router
 
 settings = get_settings()
 
@@ -35,3 +36,5 @@ async def api_root():
         "name": "ResearchMind",
         "message": "Research assistant API",
     }
+
+app.include_router(documents_router, prefix="/api/v1")
