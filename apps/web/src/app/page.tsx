@@ -5,14 +5,17 @@ import {
   ArrowUpRight,
   BookOpen,
   CheckCircle2,
+  Clock3,
   FileText,
   HeartPulse,
   Loader2,
   MessageCircle,
   Microscope,
   Paperclip,
+  Plus,
   Search,
   Sparkles,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useState } from "react";
@@ -31,6 +34,20 @@ type UploadedDocument = {
   chunks: number;
 };
 
+type Conversation = {
+  id: number;
+  question: string;
+  answer: string;
+  sources: Source[];
+  createdAt: string;
+};
+
+const exampleQuestions = [
+  "What methodology did the authors use?",
+  "What were the main findings?",
+  "What limitations did the study identify?",
+];
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -39,6 +56,7 @@ export default function Home() {
   const [asking, setAsking] = useState(false);
   const [message, setMessage] = useState("");
   const [document, setDocument] = useState<UploadedDocument | null>(null);
+  const [history, setHistory] = useState<Conversation[]>([]);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -81,10 +99,12 @@ export default function Home() {
     }
   }
 
-  async function ask(event: FormEvent) {
-    event.preventDefault();
+  async function ask(event?: FormEvent) {
+    event?.preventDefault();
 
-    if (!question.trim()) return;
+    if (!question.trim() || asking) return;
+
+    const submittedQuestion = question.trim();
 
     setAsking(true);
     setAnswer("");
@@ -96,7 +116,9 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          question: submittedQuestion,
+        }),
       });
 
       const data = await response.json();
@@ -107,6 +129,20 @@ export default function Home() {
 
       setAnswer(data.answer);
       setSources(data.sources);
+
+      setHistory((current) => [
+        {
+          id: Date.now(),
+          question: submittedQuestion,
+          answer: data.answer,
+          sources: data.sources,
+          createdAt: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+        ...current,
+      ]);
     } catch (error) {
       setAnswer(
         error instanceof Error
@@ -118,15 +154,26 @@ export default function Home() {
     }
   }
 
-  const exampleQuestions = [
-    "What methodology did the authors use?",
-    "What were the main findings?",
-    "What limitations did the study identify?",
-  ];
+  function newResearchQuestion() {
+    setQuestion("");
+    setAnswer("");
+    setSources([]);
+    setMessage("");
+  }
+
+  function selectHistory(item: Conversation) {
+    setQuestion(item.question);
+    setAnswer(item.answer);
+    setSources(item.sources);
+  }
+
+  function clearHistory() {
+    setHistory([]);
+  }
 
   return (
     <main className="min-h-screen overflow-hidden">
-      {/* Decorative background */}
+      {/* Background atmosphere */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="float-slow absolute -left-24 top-28 h-64 w-64 rounded-full bg-pink-200/30 blur-3xl" />
         <div
@@ -179,7 +226,6 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Feature pills */}
         <div className="fade-up-delay mt-8 flex flex-wrap gap-3">
           {[
             [CheckCircle2, "Grounded answers"],
@@ -204,109 +250,154 @@ export default function Home() {
       {/* Main workspace */}
       <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[330px_1fr]">
-          {/* Sidebar */}
-          <aside className="soft-card gradient-border rounded-3xl p-5">
-            <div className="mb-6 flex items-start justify-between">
-              <div>
-                <p className="text-sm font-bold text-slate-800">
-                  Research library
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Build your evidence base
-                </p>
+          {/* Left panel */}
+          <aside className="space-y-6">
+            {/* Upload */}
+            <div className="soft-card gradient-border rounded-3xl p-5">
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">
+                    Research library
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Build your evidence base
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-sky-50 p-2 text-sky-500">
+                  <Microscope size={18} />
+                </div>
               </div>
 
-              <div className="rounded-xl bg-sky-50 p-2 text-sky-500">
-                <Microscope size={18} />
-              </div>
+              <label className="group block cursor-pointer">
+                <div className="rounded-2xl border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 to-pink-50 p-7 text-center transition-all group-hover:border-pink-300 group-hover:shadow-md">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-sky-500 shadow-sm transition-transform group-hover:-translate-y-1">
+                    {uploading ? (
+                      <Loader2 size={24} className="animate-spin" />
+                    ) : (
+                      <Upload size={24} />
+                    )}
+                  </div>
+
+                  <p className="mt-4 text-sm font-bold text-slate-700">
+                    {uploading ? "Analyzing paper..." : "Add a research paper"}
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Upload a PDF to expand your research workspace
+                  </p>
+
+                  <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-sky-600 shadow-sm">
+                    <Paperclip size={13} />
+                    Choose PDF
+                  </div>
+                </div>
+
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  onChange={upload}
+                  disabled={uploading}
+                />
+              </label>
+
+              {document && (
+                <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="flex gap-3">
+                    <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-500 shadow-sm">
+                      <FileText size={16} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-slate-700">
+                        {document.filename}
+                      </p>
+
+                      <p className="mt-1 text-[11px] text-emerald-600">
+                        {document.chunks} evidence chunks indexed
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {message && (
+                <p className="mt-3 text-center text-[11px] leading-5 text-slate-400">
+                  {message}
+                </p>
+              )}
             </div>
 
-            <label className="group block cursor-pointer">
-              <div className="rounded-2xl border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 to-pink-50 p-7 text-center transition-all group-hover:border-pink-300 group-hover:shadow-md">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-sky-500 shadow-sm transition-transform group-hover:-translate-y-1">
-                  {uploading ? (
-                    <Loader2 size={24} className="animate-spin" />
-                  ) : (
-                    <Upload size={24} />
-                  )}
-                </div>
-
-                <p className="mt-4 text-sm font-bold text-slate-700">
-                  {uploading ? "Analyzing paper..." : "Add a research paper"}
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-slate-400">
-                  PDF files up to your configured server limit
-                </p>
-
-                <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-sky-600 shadow-sm">
-                  <Paperclip size={13} />
-                  Choose PDF
-                </div>
-              </div>
-
-              <input
-                type="file"
-                accept=".pdf,application/pdf"
-                className="hidden"
-                onChange={upload}
-                disabled={uploading}
-              />
-            </label>
-
-            {document && (
-              <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <div className="flex gap-3">
-                  <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-500 shadow-sm">
-                    <FileText size={16} />
+            {/* History */}
+            <div className="soft-card rounded-3xl p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-pink-50 p-2 text-pink-500">
+                    <Clock3 size={15} />
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-700">
-                      {document.filename}
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">
+                      Recent questions
                     </p>
-
-                    <p className="mt-1 text-[11px] text-emerald-600">
-                      {document.chunks} evidence chunks indexed
+                    <p className="text-[10px] text-slate-400">
+                      Your current session
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {message && !document && (
-              <p className="mt-4 rounded-xl bg-pink-50 p-3 text-xs leading-5 text-pink-600">
-                {message}
-              </p>
-            )}
-
-            {message && document && (
-              <p className="mt-3 text-center text-[11px] text-slate-400">
-                {message}
-              </p>
-            )}
-
-            <div className="mt-7 border-t border-slate-100 pt-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                Designed for
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["Medical papers", "Clinical studies", "Literature"].map(
-                  (item) => (
-                    <span
-                      key={item}
-                      className="rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500"
-                    >
-                      {item}
-                    </span>
-                  ),
+                {history.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearHistory}
+                    aria-label="Clear question history"
+                    className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-400"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 )}
               </div>
+
+              {history.length === 0 ? (
+                <div className="rounded-2xl bg-slate-50 p-5 text-center">
+                  <MessageCircle
+                    size={22}
+                    className="mx-auto text-slate-300"
+                  />
+
+                  <p className="mt-3 text-xs font-semibold text-slate-500">
+                    No questions yet
+                  </p>
+
+                  <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                    Your research questions will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {history.slice(0, 5).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selectHistory(item)}
+                      className="w-full rounded-xl border border-transparent bg-slate-50 p-3 text-left transition-all hover:border-sky-100 hover:bg-sky-50"
+                    >
+                      <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-600">
+                        {item.question}
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {item.createdAt}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </aside>
 
-          {/* Chat workspace */}
+          {/* Chat */}
           <section className="soft-card rounded-3xl p-5 sm:p-7">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
@@ -326,26 +417,40 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1.5 text-[10px] font-bold text-sky-600">
-                <Sparkles size={12} />
-                RAG powered
-              </div>
+              <button
+                type="button"
+                onClick={newResearchQuestion}
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-500 transition-all hover:border-sky-200 hover:bg-sky-50 hover:text-sky-600"
+              >
+                <Plus size={14} />
+                New question
+              </button>
             </div>
 
-            {/* Question input */}
+            {/* Input */}
             <form onSubmit={ask} className="mt-7">
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2 transition-all focus-within:border-sky-300 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-sky-100/50">
                 <textarea
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                   placeholder="Ask something about your research..."
+                  aria-label="Research question"
                   className="min-h-28 w-full resize-none bg-transparent px-4 py-3 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400"
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      (event.metaKey || event.ctrlKey)
+                    ) {
+                      event.preventDefault();
+                      ask();
+                    }
+                  }}
                 />
 
                 <div className="flex items-center justify-between border-t border-slate-200/70 px-2 pt-2">
                   <div className="hidden items-center gap-2 text-[11px] text-slate-400 sm:flex">
                     <Search size={13} />
-                    Answers are grounded in retrieved evidence
+                    ⌘ + Enter to ask
                   </div>
 
                   <button
@@ -369,7 +474,7 @@ export default function Home() {
               </div>
             </form>
 
-            {/* Example prompts */}
+            {/* Suggestions */}
             {!answer && !asking && (
               <div className="mt-5">
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
@@ -404,7 +509,7 @@ export default function Home() {
                       Searching your research
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Retrieving relevant evidence...
+                      Retrieving relevant evidence and preparing an answer...
                     </p>
                   </div>
                 </div>
@@ -424,6 +529,7 @@ export default function Home() {
                       <p className="text-sm font-bold text-slate-800">
                         ResearchMind&apos;s answer
                       </p>
+
                       <p className="text-[10px] text-slate-400">
                         Grounded in your uploaded evidence
                       </p>
@@ -442,6 +548,7 @@ export default function Home() {
                         <p className="text-sm font-bold text-slate-800">
                           Evidence used
                         </p>
+
                         <p className="text-[11px] text-slate-400">
                           Source passages retrieved for this answer
                         </p>
@@ -498,8 +605,7 @@ export default function Home() {
         </div>
 
         <span>
-          AI-assisted research • Evidence first • Built for responsible
-          exploration
+          AI-assisted research • Evidence first • Responsible exploration
         </span>
       </footer>
     </main>
