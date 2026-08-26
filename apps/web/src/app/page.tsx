@@ -1,5 +1,20 @@
 "use client";
 
+import {
+  Activity,
+  ArrowUpRight,
+  BookOpen,
+  CheckCircle2,
+  FileText,
+  HeartPulse,
+  Loader2,
+  MessageCircle,
+  Microscope,
+  Paperclip,
+  Search,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { ChangeEvent, FormEvent, useState } from "react";
 
 const API_URL =
@@ -11,6 +26,11 @@ type Source = {
   score: number;
 };
 
+type UploadedDocument = {
+  filename: string;
+  chunks: number;
+};
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -18,6 +38,7 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [asking, setAsking] = useState(false);
   const [message, setMessage] = useState("");
+  const [document, setDocument] = useState<UploadedDocument | null>(null);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -39,18 +60,24 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Upload failed");
+        throw new Error(data.detail || "Unable to process this document.");
       }
 
-      setMessage(
-        `${data.filename} indexed successfully — ${data.chunks_indexed} chunks.`,
-      );
+      setDocument({
+        filename: data.filename,
+        chunks: data.chunks_indexed,
+      });
+
+      setMessage("Research paper successfully added to your workspace.");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Upload failed.",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while processing the PDF.",
       );
     } finally {
       setUploading(false);
+      event.target.value = "";
     }
   }
 
@@ -75,50 +102,148 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Request failed");
+        throw new Error(data.detail || "Unable to answer your question.");
       }
 
       setAnswer(data.answer);
       setSources(data.sources);
     } catch (error) {
       setAnswer(
-        error instanceof Error ? error.message : "Something went wrong.",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.",
       );
     } finally {
       setAsking(false);
     }
   }
 
+  const exampleQuestions = [
+    "What methodology did the authors use?",
+    "What were the main findings?",
+    "What limitations did the study identify?",
+  ];
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto max-w-5xl px-6 py-12">
-        <header className="mb-12">
-          <div className="mb-4 inline-flex rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300">
-            AI Research Assistant
+    <main className="min-h-screen overflow-hidden">
+      {/* Decorative background */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="float-slow absolute -left-24 top-28 h-64 w-64 rounded-full bg-pink-200/30 blur-3xl" />
+        <div
+          className="float-slow absolute -right-24 top-20 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl"
+          style={{ animationDelay: "1.5s" }}
+        />
+        <div className="absolute left-1/2 top-[55%] h-80 w-80 -translate-x-1/2 rounded-full bg-violet-100/30 blur-3xl" />
+      </div>
+
+      {/* Navigation */}
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-6 sm:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-pink-400 text-white shadow-lg shadow-sky-200/50">
+            <HeartPulse size={22} strokeWidth={2.4} />
           </div>
 
-          <h1 className="text-5xl font-bold tracking-tight">
-            ResearchMind
+          <div>
+            <p className="text-lg font-bold tracking-tight text-slate-800">
+              ResearchMind
+            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              AI research companion
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm sm:flex">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          Research workspace
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="mx-auto max-w-7xl px-5 pb-10 pt-10 sm:px-8 sm:pt-16">
+        <div className="fade-up max-w-3xl">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-pink-200 bg-pink-50 px-4 py-2 text-xs font-bold text-pink-600">
+            <Sparkles size={14} />
+            Evidence-backed AI for research
+          </div>
+
+          <h1 className="text-4xl font-extrabold leading-[1.08] tracking-tight text-slate-800 sm:text-6xl">
+            Your research,
+            <br />
+            <span className="gradient-text">understood.</span>
           </h1>
 
-          <p className="mt-4 max-w-2xl text-lg text-slate-400">
-            Upload research papers, retrieve relevant evidence, and ask
-            grounded questions with citation-backed answers.
+          <p className="mt-6 max-w-2xl text-base leading-7 text-slate-500 sm:text-lg">
+            Explore medical and scientific literature with an AI research
+            companion that connects every answer back to the evidence.
           </p>
-        </header>
+        </div>
 
-        <section className="grid gap-6 md:grid-cols-[320px_1fr]">
-          <aside className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-lg font-semibold">Documents</h2>
+        {/* Feature pills */}
+        <div className="fade-up-delay mt-8 flex flex-wrap gap-3">
+          {[
+            [CheckCircle2, "Grounded answers"],
+            [BookOpen, "Paper-aware"],
+            [Activity, "Source citations"],
+          ].map(([Icon, label]) => {
+            const IconComponent = Icon as typeof CheckCircle2;
 
-            <p className="mt-2 text-sm text-slate-400">
-              Upload a PDF to add it to the research knowledge base.
-            </p>
+            return (
+              <div
+                key={label as string}
+                className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm"
+              >
+                <IconComponent size={15} className="text-sky-500" />
+                {label as string}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-            <label className="mt-6 block cursor-pointer rounded-xl border border-dashed border-slate-700 p-6 text-center hover:border-slate-500">
-              <span className="text-sm">
-                {uploading ? "Indexing..." : "Choose PDF"}
-              </span>
+      {/* Main workspace */}
+      <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-8">
+        <div className="grid gap-6 lg:grid-cols-[330px_1fr]">
+          {/* Sidebar */}
+          <aside className="soft-card gradient-border rounded-3xl p-5">
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  Research library
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Build your evidence base
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-sky-50 p-2 text-sky-500">
+                <Microscope size={18} />
+              </div>
+            </div>
+
+            <label className="group block cursor-pointer">
+              <div className="rounded-2xl border-2 border-dashed border-sky-200 bg-gradient-to-br from-sky-50 to-pink-50 p-7 text-center transition-all group-hover:border-pink-300 group-hover:shadow-md">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-sky-500 shadow-sm transition-transform group-hover:-translate-y-1">
+                  {uploading ? (
+                    <Loader2 size={24} className="animate-spin" />
+                  ) : (
+                    <Upload size={24} />
+                  )}
+                </div>
+
+                <p className="mt-4 text-sm font-bold text-slate-700">
+                  {uploading ? "Analyzing paper..." : "Add a research paper"}
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  PDF files up to your configured server limit
+                </p>
+
+                <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-sky-600 shadow-sm">
+                  <Paperclip size={13} />
+                  Choose PDF
+                </div>
+              </div>
 
               <input
                 type="file"
@@ -129,51 +254,231 @@ export default function Home() {
               />
             </label>
 
-            {message && (
-              <p className="mt-4 text-sm text-slate-400">{message}</p>
+            {document && (
+              <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <div className="flex gap-3">
+                  <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-500 shadow-sm">
+                    <FileText size={16} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-slate-700">
+                      {document.filename}
+                    </p>
+
+                    <p className="mt-1 text-[11px] text-emerald-600">
+                      {document.chunks} evidence chunks indexed
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
+
+            {message && !document && (
+              <p className="mt-4 rounded-xl bg-pink-50 p-3 text-xs leading-5 text-pink-600">
+                {message}
+              </p>
+            )}
+
+            {message && document && (
+              <p className="mt-3 text-center text-[11px] text-slate-400">
+                {message}
+              </p>
+            )}
+
+            <div className="mt-7 border-t border-slate-100 pt-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Designed for
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["Medical papers", "Clinical studies", "Literature"].map(
+                  (item) => (
+                    <span
+                      key={item}
+                      className="rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500"
+                    >
+                      {item}
+                    </span>
+                  ),
+                )}
+              </div>
+            </div>
           </aside>
 
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-lg font-semibold">Ask ResearchMind</h2>
+          {/* Chat workspace */}
+          <section className="soft-card rounded-3xl p-5 sm:p-7">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-xl bg-pink-50 p-2 text-pink-500">
+                    <MessageCircle size={18} />
+                  </div>
 
-            <form onSubmit={ask} className="mt-6">
-              <textarea
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                placeholder="What methodology did the authors use?"
-                className="min-h-32 w-full resize-none rounded-xl border border-slate-700 bg-slate-950 p-4 outline-none focus:border-slate-500"
-              />
+                  <h2 className="text-lg font-bold text-slate-800">
+                    Research workspace
+                  </h2>
+                </div>
 
-              <button
-                type="submit"
-                disabled={asking}
-                className="mt-4 rounded-xl bg-white px-5 py-3 font-medium text-slate-950 disabled:opacity-50"
-              >
-                {asking ? "Researching..." : "Ask question"}
-              </button>
+                <p className="mt-2 text-xs text-slate-400">
+                  Ask questions and discover evidence from your uploaded
+                  literature.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1.5 text-[10px] font-bold text-sky-600">
+                <Sparkles size={12} />
+                RAG powered
+              </div>
+            </div>
+
+            {/* Question input */}
+            <form onSubmit={ask} className="mt-7">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2 transition-all focus-within:border-sky-300 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-sky-100/50">
+                <textarea
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder="Ask something about your research..."
+                  className="min-h-28 w-full resize-none bg-transparent px-4 py-3 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400"
+                />
+
+                <div className="flex items-center justify-between border-t border-slate-200/70 px-2 pt-2">
+                  <div className="hidden items-center gap-2 text-[11px] text-slate-400 sm:flex">
+                    <Search size={13} />
+                    Answers are grounded in retrieved evidence
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={asking || !question.trim()}
+                    className="ml-auto flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-pink-400 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-200/50 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                  >
+                    {asking ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Researching
+                      </>
+                    ) : (
+                      <>
+                        Ask ResearchMind
+                        <ArrowUpRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </form>
 
-            {answer && (
-              <article className="mt-10 border-t border-slate-800 pt-8">
-                <h3 className="font-semibold">Answer</h3>
-
-                <p className="mt-4 whitespace-pre-wrap leading-7 text-slate-300">
-                  {answer}
+            {/* Example prompts */}
+            {!answer && !asking && (
+              <div className="mt-5">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Try asking
                 </p>
 
-                {sources.length > 0 && (
-                  <div className="mt-8">
-                    <h3 className="font-semibold">Sources</h3>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {exampleQuestions.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setQuestion(example)}
+                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-xs font-medium leading-5 text-slate-500 transition-all hover:border-sky-200 hover:bg-sky-50/50 hover:text-sky-700"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    <div className="mt-3 space-y-2">
+            {/* Loading */}
+            {asking && (
+              <div className="mt-8 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50/70 to-pink-50/50 p-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-sky-500 shadow-sm">
+                    <Activity size={18} className="animate-pulse" />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">
+                      Searching your research
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Retrieving relevant evidence...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Answer */}
+            {answer && !asking && (
+              <article className="fade-up mt-8">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-pink-100 text-sky-600">
+                      <Sparkles size={17} />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">
+                        ResearchMind&apos;s answer
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        Grounded in your uploaded evidence
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                    {answer}
+                  </p>
+                </div>
+
+                {sources.length > 0 && (
+                  <div className="mt-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">
+                          Evidence used
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Source passages retrieved for this answer
+                        </p>
+                      </div>
+
+                      <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-600">
+                        {sources.length} sources
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
                       {sources.map((source, index) => (
                         <div
                           key={`${source.filename}-${source.page}-${index}`}
-                          className="rounded-lg border border-slate-800 p-3 text-sm text-slate-400"
+                          className="group rounded-2xl border border-slate-200 bg-slate-50/60 p-4 transition-all hover:border-sky-200 hover:bg-sky-50/40"
                         >
-                          [{index + 1}] {source.filename} · page{" "}
-                          {source.page} · relevance {source.score}
+                          <div className="flex gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-pink-500 shadow-sm">
+                              {index + 1}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-bold text-slate-700">
+                                {source.filename}
+                              </p>
+
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-400">
+                                  Page {source.page}
+                                </span>
+
+                                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-600">
+                                  {Math.round(source.score * 100)}% relevance
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -182,8 +487,21 @@ export default function Home() {
               </article>
             )}
           </section>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-slate-200/70 px-5 py-7 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <div className="flex items-center gap-2">
+          <HeartPulse size={14} className="text-pink-400" />
+          <span>ResearchMind</span>
+        </div>
+
+        <span>
+          AI-assisted research • Evidence first • Built for responsible
+          exploration
+        </span>
+      </footer>
     </main>
   );
 }
